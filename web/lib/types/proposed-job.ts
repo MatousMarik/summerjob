@@ -184,20 +184,50 @@ export const ProposedJobCreateSchema = ProposedJobBasicSchema.superRefine(
 export type ProposedJobCreateDataInput = z.input<typeof ProposedJobCreateSchema>
 export type ProposedJobCreateData = z.infer<typeof ProposedJobCreateSchema>
 
-export const ProposedJobUpdateSchema = ProposedJobBasicSchema.merge(
-  z.object({
-    completed: z.boolean(),
-    hidden: z.boolean(),
-    pinnedByChange: z.object({
-      workerId: z.string(),
-      pinned: z.boolean(),
-    }),
-    toolsOnSiteUpdated: ToolsUpdateSchema.optional(),
-    toolsToTakeWithUpdated: ToolsUpdateSchema.optional(),
-    toolsOnSiteIdsDeleted: z.array(z.string()).optional(),
-    toolsToTakeWithIdsDeleted: z.array(z.string()).optional(),
-  })
-)
+export const ProposedJobUpdateSchema = ProposedJobBasicSchema.omit({
+  minWorkers: true,
+  maxWorkers: true,
+  strongWorkers: true,
+  priority: true,
+})
+  .merge(
+    z.object({
+      completed: z.boolean(),
+      hidden: z.boolean(),
+      pinnedByChange: z.object({
+        workerId: z.string(),
+        pinned: z.boolean(),
+      }),
+      toolsOnSiteUpdated: ToolsUpdateSchema.optional(),
+      toolsToTakeWithUpdated: ToolsUpdateSchema.optional(),
+      toolsOnSiteIdsDeleted: z.array(z.string()).optional(),
+      toolsToTakeWithIdsDeleted: z.array(z.string()).optional(),
+      // Re-declared WITHOUT .default() (unlike the create schema): with
+      // .partial() below, a partial update that omits these fields leaves them
+      // undefined and Prisma skips them. Keeping the defaults here would make
+      // every partial update (color tags, completed/hidden toggles, ...) reset
+      // the worker counts and priority to 1/1/0/1.
+      minWorkers: z
+        .number({
+          message: err.invalidTypeMinWorkers,
+        })
+        .int({ message: err.nonInteger })
+        .positive({ message: err.nonPositiveMinWorkers }),
+      maxWorkers: z
+        .number({
+          message: err.invalidTypeMaxWorkers,
+        })
+        .int({ message: err.nonInteger })
+        .positive({ message: err.nonPositiveMaxWorkers }),
+      strongWorkers: z
+        .number({
+          message: err.invalidTypeStrongWorkers,
+        })
+        .int({ message: err.nonInteger })
+        .nonnegative({ message: err.nonNonNegativeStrongWorkers }),
+      priority: z.number(),
+    })
+  )
   .strict()
   .partial()
   .superRefine((val, ctx) => {

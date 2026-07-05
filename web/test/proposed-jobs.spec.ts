@@ -124,6 +124,37 @@ describe('Proposed Jobs', function () {
       await api.deleteArea(area.id)
     })
 
+    it('keeps worker counts and priority when only color tags change', async function () {
+      // given: a job with non-default worker counts / priority
+      const area = await api.createArea()
+      const jobType = await api.createJobType()
+      const body = {
+        ...createProposedJobData(area.id, jobType.id),
+        minWorkers: 3,
+        maxWorkers: 5,
+        strongWorkers: 2,
+        priority: 4,
+      }
+      const job = await api.post('/api/proposed-jobs', Id.JOBS, body)
+      // when: a color-tag-only partial update (as the plan/job row sends)
+      const patch = await api.patch(
+        `/api/proposed-jobs/${job.body.id}`,
+        Id.JOBS,
+        { colorTags: ['RED', 'BLUE'] }
+      )
+      // then: color tags applied, and worker counts / priority NOT reset to
+      // the schema defaults (1/1/0/1)
+      expect(patch.status).toBe(204)
+      const resp = await api.get(`/api/proposed-jobs/${job.body.id}`, Id.JOBS)
+      expect(resp.body.colorTags).toEqual(['RED', 'BLUE'])
+      expect(resp.body.minWorkers).toBe(3)
+      expect(resp.body.maxWorkers).toBe(5)
+      expect(resp.body.strongWorkers).toBe(2)
+      expect(resp.body.priority).toBe(4)
+      // clean
+      await api.deleteArea(area.id)
+    })
+
     it("can't update a proposed-job - wrong parameter", async function () {
       // given
       const area = await api.createArea()
